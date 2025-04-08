@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.get('/api/csv/first/raw', async (req, res) => {
+app.get('/api/csv/initial/raw', async (req, res) => {
     const ftpHandler = new FTPHandler();
     try {
 
@@ -75,7 +75,7 @@ app.get('/api/csv/initial/flattened', async (req, res) => {
   }
   
 
-app.get('/api/csv/first', async (req, res) => {
+app.get('/api/csv/initial', async (req, res) => {
     const ftpHandler = new FTPHandler();
     try {
         const page = parseInt(req.query.page) || 1;
