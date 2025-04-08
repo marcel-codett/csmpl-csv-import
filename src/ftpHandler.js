@@ -8,7 +8,7 @@ class FTPHandler {
         this.client = new ftp.Client();
         this.client.ftp.verbose = false;
         this.config = {
-            host: process.env.FTP_HOST,
+            host: 'selfservice.radixpension.com',
             user: 'zoho',
             password: process.env.FTP_PASSWORD,
         };
