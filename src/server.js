@@ -29,6 +29,52 @@ app.get('/api/csv/first/raw', async (req, res) => {
     }
 });
 
+app.get('/api/csv/initial/flattened', async (req, res) => {
+    try {
+      const allData = await fetchAllInitialData(`${process.env.BASE_URL}`); // point to your own server
+      const formatted = transformData(allData);
+      res.json(formatted);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to process initial CSV data' });
+    }
+  });
+  
+  async function fetchAllInitialData(baseUrl) {
+    let page = 1;
+    let allData = [];
+    let hasMore = true;
+  
+    while (hasMore) {
+      const response = await fetch(`${baseUrl}/api/csv/initial?page=${page}`);
+      const json = await response.json();
+  
+      allData = allData.concat(json.data);
+      hasMore = json.hasNextPage || page < json.totalPages;
+      page++;
+    }
+  
+    return allData;
+  }
+  
+  function transformData(data) {
+    return data.map(record => {
+      const [firstName, ...rest] = record.fullName?.trim().split(' ') || [];
+      const lastName = rest.join(' ');
+  
+      return {
+        First_Name: firstName || '',
+        Last_Name: lastName || '',
+        Email: record.email,
+        Phone: record.phone,
+        Fax: record.penId,
+        Title: record.requestType,
+        Status: record.status
+      };
+    });
+  }
+  
+
 app.get('/api/csv/first', async (req, res) => {
     const ftpHandler = new FTPHandler();
     try {
