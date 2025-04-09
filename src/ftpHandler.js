@@ -10,7 +10,7 @@ class FTPHandler {
         this.config = {
             host: 'selfservice.radixpension.com',
             user: 'zoho',
-            password: process.env.FTP_PASSWORD || 'cvxytejjdbxbfd73e3@',
+            password: process.env.FTP_PASSWORD,
         };
     }
 
