@@ -102,24 +102,39 @@ class FTPHandler {
           trim: true,
         })[0];
 
+    // Safely extract first, middle, and last names
+        let firstName = '';
+        let middleName = '';
+        let lastName = '';
+
+        if (record.fullName) {
+            const nameParts = record.fullName.trim().split(' ');
+            firstName = nameParts[0] || '';
+            if (nameParts.length === 2) {
+                lastName = nameParts[1];
+            } else if (nameParts.length >= 3) {
+                middleName = nameParts.slice(1, -1).join(' ');
+                lastName = nameParts[nameParts.length - 1];
+            }
+        } else {
+            firstName = record.firstName || '';
+            middleName = record.middleName || '';
+            lastName = record.lastName || '';
+        }
+
         const formatted = {
-          penId: record.penId || "",
-          fullName:
-            record.fullName ||
-            `${record.firstName || ""} ${record.middleName || ""} ${
-              record.lastName || ""
-            }`.trim(),
-          firstName:
-            record.firstName || `${record.fullName.split(" ")[0]}` || "",
-          middleName:
-            record.middleName || `${record.fullName.split(" ")[1]}` || "",
-          lastName: record.lastName || record.fullName.split(" ")[2] || "",
-          phone: record.phone || "",
-          requestType: record.requestType || "",
-          email: record.email || "",
-          status: record.status || "",
-          referenceId: record.referenceId || `REF${Date.now()}-${index}`,
+            penId: record.penId || '',
+            fullName: record.fullName || `${firstName} ${middleName} ${lastName}`.trim(),
+            firstName,
+            middleName,
+            lastName,
+            phone: record.phone || '',
+            requestType: record.requestType || '',
+            email: record.email || '',
+            status: record.status || '',
+            referenceId: record.referenceId || `REF${Date.now()}-${index}`
         };
+
 
         parsedRows.push(formatted);
       } catch (error) {
