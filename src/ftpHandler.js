@@ -10,7 +10,7 @@ class FTPHandler {
         this.config = {
             host: 'selfservice.radixpension.com',
             user: 'zoho',
-            password: process.env.FTP_PASSWORD,
+            password: process.env.FTP_PASSWORD || 'cvxytejjdbxbfd73e3@',
         };
     }
 
@@ -31,117 +31,73 @@ class FTPHandler {
         );
     }
 
-    normalizeRecord(record) {
-        let fullName = record.Name || `${record.First_Name || ''} ${record.Middle_Name || ''} ${record.Last_Name || ''}`.trim();
+   
+    async downloadAndParseCSV(fileName) {
+        const downloadDir = path.join(__dirname, '../downloads');
+        if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
 
-        return {
-            penId: record.PEN_ID || record.Pen_ID || '',
-            fullName,
-            phone: record.Phone || '',
-            requestType: record.Request_Type || '',
-            status: record.Status || '',
-            // Add more fields as needed, safely
-        };
-    }
-    // async downloadAndParseCSV(fileName) {
-    //     const downloadDir = path.join(__dirname, '../downloads');
-    //     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
+        const localPath = path.join(downloadDir, fileName);
+        await this.client.downloadTo(localPath, fileName);
 
-    //     const localPath = path.join(downloadDir, fileName);
-    //     await this.client.downloadTo(localPath, fileName);
+        const fileContent = fs.readFileSync(localPath, 'utf-8');
 
-    //     const fileContent = fs.readFileSync(localPath, 'utf-8');
-    //     // fs.unlinkSync(localPath);
+        // Split lines and clean up
+        const cleanedLines = fileContent
+            .split('\n')
+            .filter(line => line.trim() !== '' && !line.toLowerCase().includes('rows affected'));
 
-    //     const records = parse(fileContent, {
-    //         columns: true,
-    //         skip_empty_lines: true
-    //     });
+        const parsedRows = [];
 
-        
-    //     const formattedRecords = records.map(row => ({
-    //         Pen_ID: row[0],
-    //         FirstName: row[1],
-    //         MiddleName: row[2],
-    //         LastName: row[3],
-    //         Phone: row[4],
-    //         email: row[5],
-    //         Reference_ID: row[6],
-    //         Status: row[7],
-    //         Request_Type: row[8],
-    //     }));
-    //     const normalizedRecords = formattedRecords.map(this.normalizeRecord);
-        
-    //     return normalizedRecords;
-    // }
+        for (const [index, line] of cleanedLines.entries()) {
+            const columns = line.split(',').map(col => col.trim());
+            const colCount = columns.length;
 
+            let headers;
+            if (colCount === 8) {
+                headers = ['penId', 'firstName', 'middleName', 'lastName', 'phone', 'email', 'referenceId', 'status'];
+            } else if (colCount === 6) {
+                headers = ['penId', 'fullName', 'phone', 'requestType', 'email', 'status'];
+            } else if (colCount === 5) {
+                headers = ['penId', 'fullName', 'phone', 'requestType', 'status'];
+            } 
+            else if (colCount === 7) {
+                headers = ['penId', 'fullName', 'phone', 'requestType', 'email', 'referenceId', 'status'];
+            } 
+            else {
+                console.warn(`Skipping row ${index + 1}: unexpected column count (${colCount})`);
+                continue;
+            }
 
+            try {
+                const record = parse(line, {
+                    columns: headers,
+                    skip_empty_lines: true,
+                    trim: true
+                })[0];
 
+                const formatted = {
+                    penId: record.penId || '',
+                    fullName: record.fullName || `${record.firstName || ''} ${record.middleName || ''} ${record.lastName || ''}`.trim(),
+                    firstName: record.firstName || `${record.fullName.split(' ')[0]}`|| '',
+                    middleName: record.middleName || `${record.fullName.split(' ')[1]}`|| '',
+                    lastName: record.lastName || record.fullName.split(' ').length == 2 ? `${record.fullName.split(' ')[1]}` : `${record.fullName.split(' ')[2]}`|| '',
+                    phone: record.phone || '',
+                    requestType: record.requestType || '',
+                    email: record.email || '',
+                    status: record.status || '',
+                    referenceId: record.referenceId || `REF${Date.now()}-${index}`
+                };
 
-async downloadAndParseCSV(fileName) {
-    const downloadDir = path.join(__dirname, '../downloads');
-    if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
-
-    const localPath = path.join(downloadDir, fileName);
-    await this.client.downloadTo(localPath, fileName);
-
-    const fileContent = fs.readFileSync(localPath, 'utf-8');
-
-    // Split lines and clean up
-    const cleanedLines = fileContent
-        .split('\n')
-        .filter(line => line.trim() !== '' && !line.toLowerCase().includes('rows affected'));
-
-    const parsedRows = [];
-
-    for (const [index, line] of cleanedLines.entries()) {
-        const columns = line.split(',').map(col => col.trim());
-        const colCount = columns.length;
-
-        let headers;
-        if (colCount === 8) {
-            headers = ['penId', 'firstName', 'middleName', 'lastName', 'phone', 'email', 'referenceId', 'status'];
-        } else if (colCount === 6) {
-            headers = ['penId', 'fullName', 'phone', 'requestType', 'email', 'status'];
-        } else if (colCount === 5) {
-            headers = ['penId', 'fullName', 'phone', 'requestType', 'status'];
-        } 
-        else if (colCount === 7) {
-            headers = ['penId', 'fullName', 'phone', 'requestType', 'email', 'referenceId', 'status'];
-        } 
-        else {
-            console.warn(`Skipping row ${index + 1}: unexpected column count (${colCount})`);
-            continue;
+                parsedRows.push(formatted);
+            } catch (error) {
+                console.warn(`Failed to parse row ${index + 1}:`, error.message);
+            }
         }
 
-        try {
-            const record = parse(line, {
-                columns: headers,
-                skip_empty_lines: true,
-                trim: true
-            })[0];
-
-            const formatted = {
-                penId: record.penId || '',
-                fullName: record.fullName || `${record.firstName || ''} ${record.middleName || ''} ${record.lastName || ''}`.trim(),
-                phone: record.phone || '',
-                requestType: record.requestType || '',
-                email: record.email || '',
-                status: record.status || '',
-                referenceId: record.referenceId || `REF${Date.now()}-${index}`
-            };
-
-            parsedRows.push(formatted);
-        } catch (error) {
-            console.warn(`Failed to parse row ${index + 1}:`, error.message);
-        }
+        return parsedRows;
     }
 
-    return parsedRows;
-}
 
-    
-    
     async getFirstFileRecords() {
         const files = await this.listCSVFiles();
         if (files.length === 0) throw new Error('No CSV files found');

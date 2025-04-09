@@ -10,72 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.get('/api/csv/initial/raw', async (req, res) => {
-    const ftpHandler = new FTPHandler();
-    try {
-
-        await ftpHandler.connect();
-        const files = await ftpHandler.listCSVFiles();
-        const firstFile = files[0];
-
-        const filePath = path.join(__dirname, '../downloads', firstFile.name);
-        await ftpHandler.client.downloadTo(filePath, firstFile.name);
-        await ftpHandler.disconnect();
-
-        res.download(filePath); // Sends it as file download
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/csv/initial/flattened', async (req, res) => {
-    try {
-      const allData = await fetchAllInitialData(`${process.env.BASE_URL}`); // point to your own server
-      const formatted = transformData(allData);
-      res.json(formatted);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Failed to process initial CSV data' });
-    }
-  });
-  
-  async function fetchAllInitialData(baseUrl) {
-    let page = 1;
-    let allData = [];
-    let hasMore = true;
-  
-    while (hasMore) {
-      const response = await fetch(`${baseUrl}/api/csv/initial?page=${page}`);
-      const json = await response.json();
-  
-      allData = allData.concat(json.data);
-      hasMore = json.hasNextPage || page < json.totalPages;
-      page++;
-    }
-  
-    return allData;
-  }
-  
-  function transformData(data) {
-    return data.map(record => {
-      const [firstName, ...rest] = record.fullName?.trim().split(' ') || [];
-      const lastName = rest.join(' ');
-  
-      return {
-        First_Name: firstName || '',
-        Last_Name: lastName || '',
-        Email: record.email,
-        Phone: record.phone,
-        Fax: record.penId,
-        Title: record.requestType,
-        Status: record.status
-      };
-    });
-  }
-  
-
-app.get('/api/csv/initial', async (req, res) => {
+app.get('/api/csv/first', async (req, res) => {
     const ftpHandler = new FTPHandler();
     try {
         const page = parseInt(req.query.page) || 1;
@@ -105,11 +40,19 @@ app.get('/api/csv/initial', async (req, res) => {
 });
 app.get('/api/csv/latest', async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 2000;
+        const start = (page - 1) * limit;
+        const end = start + limit;
+ 
         const ftpHandler = new FTPHandler();
         await ftpHandler.connect();
         
         const csvData = await ftpHandler.getLatestFileRecords();
         await ftpHandler.disconnect();
+
+        const total = csvData.length;
+        const pageRecords = csvData.slice(start, end);
 
         if (!csvData) {
             return res.status(404).json({ error: 'No CSV file found' });
@@ -117,7 +60,10 @@ app.get('/api/csv/latest', async (req, res) => {
 
         res.json({
             success: true,
-            data: csvData
+            total,
+            page,
+            limit,
+            records: pageRecords
         });
     } catch (error) {
         console.error('Error:', error);
